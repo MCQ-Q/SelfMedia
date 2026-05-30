@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Project ───
+
+model Project {
+  id              String   @id @default(cuid())
+  userId          String   @default("default")
+  title           String
+  status          String   @default("draft") // draft | material_input | topics_generated | topic_selected | references_ready | script_generating | script_draft | exported | archived
+  currentStep     String   @default("input") // input | topics | topic_selection | references | script | exported
+  selectedTopicId String?
+  targetPlatform  String   @default("douyin")
+  videoType       String   @default("oral")
+  durationSeconds Int      @default(60)
+  metadata        String   @default("{}") // JSON
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sourceMaterials SourceMaterial[]
+  topics          Topic[]
+  references      Reference[]
+  scriptVersions  ScriptVersion[]
+  workflowRuns    WorkflowRun[]
+  agentRuns       AgentRun[]
+  projectEvents   ProjectEvent[]
+
+  @@index([userId, status])
+  @@index([updatedAt])
+}
+
+// ─── Source Material ───
+
+model SourceMaterial {
+  id               String   @id @default(cuid())
+  projectId        String
+  type             String   @default("note") // chat_log | reflection | note | draft
+  contentEncrypted String   @default("") // encrypted content, MVP plaintext
+  contentPreview   String   @default("") // preview for listing
+  metadata         String   @default("{}") // JSON
+  createdAt        DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// ─── Topic ───
+
+model Topic {
+  id             String   @id @default(cuid())
+  projectId      String
+  title          String
+  themeSummary   String   @default("")
+  targetAudience String
+  coreConflict   String
+  emotionalTone  String
+  score          Float
+  reason         String
+  selected       Boolean  @default(false)
+  agentRunId     String?
+  createdAt      DateTime @default(now())
+
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  references    Reference[]
+  knowledgeItems KnowledgeItem[]
+
+  @@index([projectId])
+}
+
+// ─── Reference ───
+
+model Reference {
+  id         String  @id @default(cuid())
+  projectId  String
+  topicId    String
+  sourceType String  @default("manual") // manual | web_search | platform_api
+  platform   String  @default("douyin")
+  title      String
+  url        String?
+  author     String  @default("")
+  transcript String
+  metrics    String  @default("{}") // JSON
+  rawData    String  @default("{}") // JSON
+  createdAt  DateTime @default(now())
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  topic          Topic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  knowledgeItems KnowledgeItem[]
+
+  @@index([topicId])
+}
+
+// ─── Knowledge Item (extracted from references) ───
+
+model KnowledgeItem {
+  id          String   @id @default(cuid())
+  referenceId String
+  topicId     String
+  itemType    String   // hook | structure | emotion | visual | comment_insight | bgm
+  content     String
+  tags        String   @default("[]") // JSON array
+  confidence  Float    @default(0.8)
+  createdAt   DateTime @default(now())
+
+  reference Reference @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  topic     Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, itemType])
+}
+
+// ─── Workflow Run ───
+
+model WorkflowRun {
+  id                 String   @id @default(cuid())
+  projectId          String
+  workflowType       String   // topic_generation | reference_collection | script_generation | segment_rewrite
+  status             String   @default("pending") // pending | running | success | failed | cancelled
+  input              String   @default("{}") // JSON
+  result             String   @default("{}") // JSON
+  projectStatusBefore String  @default("")
+  currentStepBefore  String   @default("")
+  errorMessage       String?
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  createdAt          DateTime @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  steps   WorkflowStep[]
+  agents  AgentRun[]
+
+  @@index([projectId, workflowType, status])
+}
+
+// ─── Workflow Step ───
+
+model WorkflowStep {
+  id            String   @id @default(cuid())
+  workflowRunId String
+  stepKey       String   // topic | reference | outline | hook | dialogue | emotion | visual | bgm | director | segment_rewrite
+  status        String   @default("pending") // pending | running | success | failed | skipped
+  dependsOn     String   @default("[]") // JSON array of stepKeys
+  retryCount    Int      @default(0)
+  errorMessage  String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  workflowRun WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  agentRuns   AgentRun[]
+
+  @@index([workflowRunId, status])
+}
+
+// ─── Agent Run ───
+
+model AgentRun {
+  id             String   @id @default(cuid())
+  projectId      String
+  workflowRunId  String
+  workflowStepId String
+  agentType      String   // topic | reference | outline | hook | dialogue | emotion | visual | bgm | director | segment_rewrite
+  status         String   @default("pending") // pending | running | success | failed | cancelled
+  model          String   @default("")
+  inputSnapshot  String   @default("{}") // JSON - desensitized input summary
+  outputSummary  String?
+  errorMessage   String?
+  retryCount     Int      @default(0)
+  attemptNo      Int      @default(1)
+  tokenUsage     String   @default("{}") // JSON { promptTokens, completionTokens, totalTokens }
+  durationMs     Int      @default(0)
+  createdAt      DateTime @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workflowRun  WorkflowRun   @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowStep WorkflowStep  @relation(fields: [workflowStepId], references: [id], onDelete: Cascade)
+  outputs      AgentOutput[]
+
+  @@index([workflowRunId, agentType])
+  @@index([status])
+}
+
+// ─── Agent Output ───
+
+model AgentOutput {
+  id            String   @id @default(cuid())
+  agentRunId    String
+  outputType    String   // topic_list | reference_analysis | outline | hook_plan | dialogue_track | emotion_track | visual_track | bgm_track | final_script | segment_rewrite
+  content       String   // JSON
+  schemaVersion String   @default("1.0")
+  createdAt     DateTime @default(now())
+
+  agentRun AgentRun @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+}
+
+// ─── Script Version ───
+
+model ScriptVersion {
+  id                   String   @id @default(cuid())
+  projectId            String
+  workflowRunId        String?
+  topicId              String
+  versionNo            Int      @default(1)
+  title                String
+  summary              String
+  totalDurationSeconds Float    @default(60)
+  content              String   @default("{}") // JSON blob for backward compat
+  status               String   @default("draft") // draft | approved | exported
+  createdByAgentRunId  String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  segments ScriptSegment[]
+
+  @@index([projectId, versionNo])
+}
+
+// ─── Script Segment ───
+
+model ScriptSegment {
+  id              String   @id @default(cuid())
+  scriptVersionId String
+  segmentKey      String
+  orderIndex      Int
+  startTime       Float
+  endTime         Float
+  segmentGoal     String   @default("")
+  dialogue        String   @default("")
+  subtitleText    String   @default("")
+  directorNote    String   @default("")
+  isLocked        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  scriptVersion ScriptVersion  @relation(fields: [scriptVersionId], references: [id], onDelete: Cascade)
+  tracks        SegmentTrack[]
+
+  @@index([scriptVersionId, orderIndex])
+}
+
+// ─── Segment Track ───
+
+model SegmentTrack {
+  id         String   @id @default(cuid())
+  segmentId  String
+  trackType  String   // hook | emotion | visual | bgm | edit
+  content    String   // JSON
+  agentRunId String?
+  createdAt  DateTime @default(now())
+
+  segment ScriptSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+}
+
+// ─── Project Event (for SSE) ───
+
+model ProjectEvent {
+  id            Int      @id @default(autoincrement())
+  projectId     String
+  workflowRunId String?
+  eventType     String
+  payload       String   @default("{}") // JSON
+  createdAt     DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, id])
+}
