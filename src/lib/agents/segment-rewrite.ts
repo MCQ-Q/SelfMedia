@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const segmentRewriteConfig: AgentConfig = {
   type: "segment_rewrite",
-  model: process.env.LLM_REWRITE_MODEL || "deepseek-chat",
+  model: process.env.LLM_REWRITE_MODEL || "v4-flash",
   temperature: 0.6,
   maxTokens: 4096,
   thinking: "disabled",

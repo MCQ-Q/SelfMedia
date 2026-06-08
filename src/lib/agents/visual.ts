@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const visualConfig: AgentConfig = {
   type: "visual",
-  model: process.env.LLM_VISUAL_MODEL || "deepseek-chat",
+  model: process.env.LLM_VISUAL_MODEL || "v4-flash",
   temperature: 0.7,
   maxTokens: 8192,
   thinking: "disabled",
