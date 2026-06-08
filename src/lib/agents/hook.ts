@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const hookConfig: AgentConfig = {
   type: "hook",
-  model: process.env.LLM_HOOK_MODEL || "deepseek-chat",
+  model: process.env.LLM_HOOK_MODEL || "v4-pro",
   temperature: 0.8,
   maxTokens: 4096,
   thinking: "disabled",

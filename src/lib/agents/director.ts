@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const directorConfig: AgentConfig = {
   type: "director",
-  model: process.env.LLM_DIRECTOR_MODEL || "deepseek-chat",
+  model: process.env.LLM_DIRECTOR_MODEL || "v4-pro",
   temperature: 0.3,
   maxTokens: 16384,
   thinking: "disabled",
