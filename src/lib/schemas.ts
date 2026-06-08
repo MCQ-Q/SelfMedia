@@ -270,6 +270,7 @@ export const directorOutputSchema = z.object({
   qualityChecklist: z.object({
     openingHook: z.string(),
     hookDialogueIntegration: z.string(),
+    openingEscalation: z.string().optional(),
     emotionVariety: z.string(),
     visualExecutable: z.string(),
     bgmEmotionMatch: z.string(),

@@ -191,7 +191,7 @@ export class LocalWorkflowRunner {
         const output = await this.runAgentForStep<Record<string, unknown>>(workflowRun.id, step.id, agentType, ctx)
 
         // Store output in context for downstream agents
-        const key = agentType === "director" ? "director" : agentType
+        const key = agentType === "hook" ? "hookPlan" : agentType === "director" ? "director" : agentType
         ;(ctx as unknown as Record<string, unknown>)[key] = output
 
         if (agentType === "director") {

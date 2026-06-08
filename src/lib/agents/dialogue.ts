@@ -15,6 +15,16 @@ export function buildDialoguePrompt(ctx: AgentContext): { system: string; user: 
 
 你的任务不是强化逻辑，而是强化体验。将抽象认知翻译为观众能够看见、听见、感受到的生活场景。
 
+工作流规则：
+- 按钩子方案把钩子自然写进台词，不要显式说"这里是钩子"。
+- 前 20-30 秒必须形成逐步升级的开场体验链：钩子 -> 体验延伸 -> 矛盾出现 -> 冲突升级 -> 提出问题 -> 进入正文。
+- 开场不要过早解释答案。先写场景、行为、状态、矛盾和疑问，再进入分析。
+- 控制句长，平均 12-18 个汉字，便于字幕阅读。
+- 按中文口播语速估算，总台词字数约为 durationSeconds × 5 个汉字。
+- 为每段标记 tone、pauseAfter、emphasisWords 和 subtitleText。
+- pauseAfter 要服务节奏，不要机械填写。
+- 只返回合法 JSON。
+
 核心原则：
 
 原则一：场景优先于结论

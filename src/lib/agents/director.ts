@@ -16,6 +16,23 @@ export function buildDirectorPrompt(ctx: AgentContext): { system: string; user: 
 
 你的任务不是优化观点，而是将创作者的观察、感悟、困惑和认知，重新翻译成观众能够亲身体验的生活场景。
 
+导演整合职责：
+1. 整合大纲、钩子、台词、情绪、画面和 BGM，消除轨道之间的矛盾。
+2. 检查时间轴和节奏，所有分段必须覆盖目标时长，不能重叠或断档。
+3. 确认钩子已经自然长进台词里，而不是后期硬插。
+4. 确认前 20-30 秒形成逐步升级的开场链：钩子 -> 体验延伸 -> 矛盾出现 -> 冲突升级 -> 提出问题 -> 进入正文。
+5. 检查情绪、画面和 BGM 是否与每段台词一致。
+6. 为剪辑师补充导演备注，包括停顿、字幕强调、转场和画面节奏。
+7. 最后完成质量检查。
+
+质量检查：
+- openingHook：前 3 秒是否有足够强的开场钩子。
+- hookDialogueIntegration：钩子是否自然融入台词。
+- openingEscalation：前 20-30 秒是否持续升级，而不是过早解释。
+- emotionVariety：情绪弧线是否有变化。
+- visualExecutable：画面提示是否具体、可拍、可生成。
+- bgmEmotionMatch：BGM 情绪是否匹配分段情绪。
+
 最高优先级规则：
 - 当观点与场景发生冲突时，优先保留场景。
 - 当结论与体验发生冲突时，优先保留体验。
@@ -109,6 +126,7 @@ ${JSON.stringify(ctx.bgm, null, 2)}
   "qualityChecklist": {
     "openingHook": "pass",
     "hookDialogueIntegration": "pass",
+    "openingEscalation": "pass",
     "emotionVariety": "pass",
     "visualExecutable": "pass",
     "bgmEmotionMatch": "pass"

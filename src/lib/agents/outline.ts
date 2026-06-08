@@ -14,6 +14,8 @@ export function buildOutlinePrompt(ctx: AgentContext): { system: string; user: s
 IMPORTANT:
 - Design segments that cover the FULL target duration.
 - The first segment (0-5s) MUST include a strong opening that grabs attention.
+- Reserve the first 20-30 seconds for an opening experience chain: hook -> experience extension -> contradiction -> conflict escalation -> question -> transition into the body.
+- Do not let the outline jump from hook directly into explanation. The body explanation should begin only after the opening question has been established.
 - The last segment MUST include a call-to-action or memorable closing.
 - Use distinct segment keys like "s1", "s2", "s3", etc.
 - Segment times must be contiguous: each segment's startTime = previous segment's endTime.
