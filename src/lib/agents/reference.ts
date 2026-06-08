@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const referenceConfig: AgentConfig = {
   type: "reference",
-  model: process.env.LLM_REFERENCE_MODEL || "v4-flash",
+  model: process.env.LLM_REFERENCE_MODEL || "deepseek-v4-flash",
   temperature: 0.2,
   maxTokens: 8192,
   thinking: "disabled",

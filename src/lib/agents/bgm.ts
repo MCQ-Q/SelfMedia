@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const bgmConfig: AgentConfig = {
   type: "bgm",
-  model: process.env.LLM_BGM_MODEL || "v4-flash",
+  model: process.env.LLM_BGM_MODEL || "deepseek-v4-flash",
   temperature: 0.4,
   maxTokens: 4096,
   thinking: "disabled",

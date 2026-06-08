@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const emotionConfig: AgentConfig = {
   type: "emotion",
-  model: process.env.LLM_EMOTION_MODEL || "v4-flash",
+  model: process.env.LLM_EMOTION_MODEL || "deepseek-v4-flash",
   temperature: 0.4,
   maxTokens: 4096,
   thinking: "disabled",

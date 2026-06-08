@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const dialogueConfig: AgentConfig = {
   type: "dialogue",
-  model: process.env.LLM_DIALOGUE_MODEL || "v4-pro",
+  model: process.env.LLM_DIALOGUE_MODEL || "deepseek-v4-pro",
   temperature: 0.7,
   maxTokens: 8192,
   thinking: "disabled",

@@ -2,7 +2,7 @@ import type { AgentConfig, AgentContext } from "./types"
 
 export const outlineConfig: AgentConfig = {
   type: "outline",
-  model: process.env.LLM_OUTLINE_MODEL || "v4-flash",
+  model: process.env.LLM_OUTLINE_MODEL || "deepseek-v4-flash",
   temperature: 0.5,
   maxTokens: 4096,
   thinking: "disabled",
