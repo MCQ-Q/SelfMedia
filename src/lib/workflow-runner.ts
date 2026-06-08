@@ -479,7 +479,7 @@ export class LocalWorkflowRunner {
             segmentGoal: seg.segmentGoal,
             dialogue: seg.dialogue,
             subtitleText: seg.subtitleText,
-            directorNote: seg.directorNote,
+            directorNote: this.buildDirectorNote(seg),
             isLocked: false,
           },
         })
@@ -506,6 +506,40 @@ export class LocalWorkflowRunner {
     })
 
     return scriptVersionId
+  }
+
+  private buildDirectorNote(seg: DirectorOutput["segments"][number]): string {
+    const sections: string[] = []
+    const note = seg.directorNote.trim()
+    if (note) sections.push(note)
+
+    if (seg.contentValueReview) {
+      sections.push([
+        "内容价值审查：",
+        `分区：${seg.contentValueReview.zone}`,
+        `原因：${seg.contentValueReview.reason}`,
+        `处理：${seg.contentValueReview.handling}`,
+      ].join("\n"))
+    }
+
+    if (seg.revisionRecords.length > 0) {
+      sections.push([
+        "导演修改记录：",
+        ...seg.revisionRecords.map(record => this.formatRevisionRecord(record)),
+      ].join("\n\n"))
+    }
+
+    return sections.join("\n\n")
+  }
+
+  private formatRevisionRecord(record: DirectorOutput["segments"][number]["revisionRecords"][number]): string {
+    const lines = [`【${record.action}】`]
+    if (record.originalPosition) lines.push(`原位置：${record.originalPosition}`)
+    if (record.newPosition) lines.push(`新位置：${record.newPosition}`)
+    if (record.original) lines.push(`原台词：${record.original}`)
+    if (record.revised) lines.push(`修改：${record.revised}`)
+    lines.push(`原因：${record.reason}`)
+    return lines.join("\n")
   }
 
   private async failWorkflow(workflowRunId: string, projectId: string, error: string) {

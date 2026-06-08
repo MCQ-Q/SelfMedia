@@ -260,6 +260,19 @@ export const directorSegmentSchema = z.object({
   dialogue: z.string(),
   subtitleText: z.string(),
   directorNote: z.string(),
+  contentValueReview: z.object({
+    zone: z.enum(["A_甜点区", "B_中性区", "C_无效区"]),
+    reason: z.string(),
+    handling: z.string(),
+  }).optional(),
+  revisionRecords: z.array(z.object({
+    action: z.string(),
+    original: z.string().optional(),
+    revised: z.string().optional(),
+    originalPosition: z.string().optional(),
+    newPosition: z.string().optional(),
+    reason: z.string(),
+  })).default([]),
   tracks: directorTrackSchema,
 })
 
@@ -271,6 +284,8 @@ export const directorOutputSchema = z.object({
     openingHook: z.string(),
     hookDialogueIntegration: z.string(),
     openingEscalation: z.string().optional(),
+    sweetSpotReview: z.string().optional(),
+    resonancePriority: z.string().optional(),
     emotionVariety: z.string(),
     visualExecutable: z.string(),
     bgmEmotionMatch: z.string(),

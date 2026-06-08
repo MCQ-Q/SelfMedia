@@ -37,6 +37,14 @@ function parseTrack(tracks: SegmentWithTracks["tracks"], type: string): Record<s
   }
 }
 
+function escapeTableCell(value: string | undefined): string {
+  return (value || "").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>")
+}
+
+function renderMultilineNote(note: string): string {
+  return note.split(/\r?\n/).map(line => `  ${line}`).join("\n")
+}
+
 export function renderMarkdownFromSegments(script: ScriptVersionWithSegments): string {
   const { title, totalDurationSeconds, summary, segments } = script
 
@@ -53,11 +61,11 @@ export function renderMarkdownFromSegments(script: ScriptVersionWithSegments): s
 
   for (const seg of segments) {
     const time = `${seg.startTime}-${seg.endTime}s`
-    const dialogue = seg.dialogue.replace(/\|/g, "\\|")
-    const subtitle = seg.subtitleText.replace(/\|/g, "\\|")
+    const dialogue = escapeTableCell(seg.dialogue)
+    const subtitle = escapeTableCell(seg.subtitleText)
 
     const visual = parseTrack(seg.tracks, "visual")
-    const visualText = visual?.description?.toString().replace(/\|/g, "\\|") || ""
+    const visualText = escapeTableCell(visual?.description?.toString())
 
     const emotion = parseTrack(seg.tracks, "emotion")
     const emotionText = emotion
@@ -65,12 +73,12 @@ export function renderMarkdownFromSegments(script: ScriptVersionWithSegments): s
       : ""
 
     const bgm = parseTrack(seg.tracks, "bgm")
-    const bgmText = bgm?.mood?.toString().replace(/\|/g, "\\|") || ""
+    const bgmText = escapeTableCell(bgm?.mood?.toString())
 
     const hook = parseTrack(seg.tracks, "hook")
-    const hookText = hook?.type?.toString().replace(/\|/g, "\\|") || ""
+    const hookText = escapeTableCell(hook?.type?.toString())
 
-    const note = seg.directorNote.replace(/\|/g, "\\|")
+    const note = escapeTableCell(seg.directorNote)
 
     md += `| ${time} | ${dialogue} | ${subtitle} | ${visualText} | ${emotionText} | ${bgmText} | ${hookText} | ${note} |\n`
   }
@@ -117,7 +125,7 @@ export function renderMarkdownFromSegments(script: ScriptVersionWithSegments): s
   md += `\n### 导演备注汇总\n\n`
   for (const seg of segments) {
     if (seg.directorNote) {
-      md += `- [${seg.startTime}-${seg.endTime}s] ${seg.directorNote}\n`
+      md += `- [${seg.startTime}-${seg.endTime}s]\n${renderMultilineNote(seg.directorNote)}\n`
     }
   }
 
@@ -139,14 +147,14 @@ export function renderMarkdown(script: ScriptContent): string {
 
   for (const seg of segments) {
     const time = `${seg.startTime}-${seg.endTime}s`
-    const dialogue = seg.dialogue.replace(/\|/g, "\\|")
-    const subtitle = seg.subtitleText.replace(/\|/g, "\\|")
-    const visual = seg.visual?.description?.replace(/\|/g, "\\|") || ""
+    const dialogue = escapeTableCell(seg.dialogue)
+    const subtitle = escapeTableCell(seg.subtitleText)
+    const visual = escapeTableCell(seg.visual?.description)
     const emotion = seg.emotion
       ? `${seg.emotion.primary} (${seg.emotion.intensity}/10)`
       : ""
-    const bgm = seg.bgm?.mood?.replace(/\|/g, "\\|") || ""
-    const note = seg.directorNote?.replace(/\|/g, "\\|") || ""
+    const bgm = escapeTableCell(seg.bgm?.mood)
+    const note = escapeTableCell(seg.directorNote)
 
     md += `| ${time} | ${dialogue} | ${subtitle} | ${visual} | ${emotion} | ${bgm} | ${note} |\n`
   }
@@ -171,7 +179,7 @@ export function renderMarkdown(script: ScriptContent): string {
   md += `### 导演备注汇总\n\n`
   for (const seg of segments) {
     if (seg.directorNote) {
-      md += `- [${seg.startTime}-${seg.endTime}s] ${seg.directorNote}\n`
+      md += `- [${seg.startTime}-${seg.endTime}s]\n${renderMultilineNote(seg.directorNote)}\n`
     }
   }
 

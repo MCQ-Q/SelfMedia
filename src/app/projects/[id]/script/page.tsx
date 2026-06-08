@@ -497,9 +497,9 @@ export default function ScriptPage() {
 
                   {/* Director note */}
                   <div>
-                    <Label className="text-xs text-muted-foreground">导演备注</Label>
+                    <Label className="text-xs text-muted-foreground">导演备注 / 内容审查 / 修改记录</Label>
                     <Textarea
-                      className="mt-1 text-xs min-h-[32px]"
+                      className="mt-1 text-xs min-h-[140px]"
                       value={seg.directorNote}
                       onChange={e => handleSegmentEdit(seg.id, { directorNote: e.target.value })}
                       disabled={seg.isLocked}
