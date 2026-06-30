@@ -1,8 +1,8 @@
-import { prisma } from "./prisma"
+﻿import { prisma } from "./prisma"
 import { llmClient } from "./llm-client"
-import { getAgentDefinition, SCRIPT_PIPELINE_STEPS } from "./agents"
+import { getAgentDefinition, OBSERVATION_ARCHIVE_STEPS, SCRIPT_PIPELINE_STEPS } from "./agents"
 import type { AgentContext } from "./agents/types"
-import type { TopicOutput, ReferenceOutput, OutlineOutput, HookPlanOutput, DialogueOutput, EmotionOutput, VisualOutput, BgmOutput, DirectorOutput, RewriteSegmentOutput } from "./schemas"
+import type { TopicOutput, ObservationArchiveOutput, ReferenceOutput, OutlineOutput, HookPlanOutput, DialogueOutput, EmotionOutput, VisualOutput, BgmOutput, DirectorOutput, RewriteSegmentOutput } from "./schemas"
 
 // ─── Helpers ───
 
@@ -22,6 +22,57 @@ export class LocalWorkflowRunner {
   // Public API
   // ═══════════════════════════════════════════════════════════
 
+  /** Step 0: Archive source material as reusable life observation assets */
+  async runObservationArchive(
+    projectId: string,
+    sourceContent: string,
+    sourceMaterialIds: string[],
+    platform: string,
+    videoType: string,
+    durationSeconds: number,
+  ): Promise<ObservationArchiveOutput> {
+    const workflowRun = await this.createWorkflowRun(projectId, "observation_archive", OBSERVATION_ARCHIVE_STEPS)
+    const step = workflowRun.steps[0]
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } })
+    const ctx = {
+      ...this.baseContext(projectId, workflowRun.id, sourceContent, platform, videoType, durationSeconds),
+      topicTitle: project?.title || "",
+    }
+
+    const result = await this.runAgentForStep<ObservationArchiveOutput>(workflowRun.id, step.id, "observation_archive", ctx)
+
+    await prisma.$transaction(async (tx) => {
+      await tx.observationArchive.create({
+        data: {
+          projectId,
+          sourceMaterialIds: JSON.stringify(sourceMaterialIds),
+          archiveCode: result.archiveCode,
+          status: "archived",
+          originalLanguage: result.originalLanguage,
+          summary: result.summary,
+          content: JSON.stringify(result.card),
+          tags: JSON.stringify(result.tags),
+          futureUse: result.futureUse,
+        },
+      })
+      await tx.workflowRun.update({
+        where: { id: workflowRun.id },
+        data: {
+          status: "success",
+          finishedAt: new Date(),
+          result: JSON.stringify({ archiveCode: result.archiveCode }),
+        },
+      })
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentStep: "observation_archive" },
+      })
+    })
+
+    await this.emitEvent(projectId, workflowRun.id, "workflow_completed", { result: { archiveCode: result.archiveCode } })
+    return result
+  }
   /** Step 1: Generate topic candidates from source material */
   async runTopicGeneration(
     projectId: string,
@@ -620,6 +671,10 @@ export class LocalWorkflowRunner {
   }
 
   private makeSummary(agentType: string, output: unknown): string {
+    if (agentType === "observation_archive") {
+      const o = output as ObservationArchiveOutput
+      return `Observation archive ${o.archiveCode}: ${o.summary}`
+    }
     if (agentType === "topic") {
       const o = output as TopicOutput
       return `${o.candidates.length} candidates: ${o.candidates.map(c => c.title).join("; ")}`
@@ -662,6 +717,7 @@ export class LocalWorkflowRunner {
   private mapOutputType(agentType: string): string {
     const map: Record<string, string> = {
       topic: "topic_list",
+      observation_archive: "observation_archive",
       reference: "reference_analysis",
       outline: "outline",
       hook: "hook_plan",
@@ -751,3 +807,5 @@ export class LocalWorkflowRunner {
 }
 
 export const workflowRunner = new LocalWorkflowRunner()
+
+

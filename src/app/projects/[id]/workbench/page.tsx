@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -28,6 +28,55 @@ interface SourceMaterialItem {
   createdAt: string
 }
 
+interface ObservationArchiveCard {
+  originalEvent?: {
+    timeOrStage?: string
+    scene?: string
+    concreteEvent?: string
+    peopleInvolved?: string[]
+    keyDetails?: string[]
+  }
+  originalLanguage?: {
+    creatorQuote?: string
+    preservedPhrases?: string[]
+  }
+  currentState?: {
+    behavior?: string
+    emotion?: string
+    bodyFeeling?: string
+    thoughts?: string
+    perceivedProblemAtThatTime?: string
+  }
+  laterObservation?: {
+    laterChanges?: string
+    newView?: string
+    newUnderstanding?: string
+  }
+  hiddenThemes?: string[]
+  extensibleMaterials?: {
+    similarExperiences?: string[]
+    relatedStories?: string[]
+    futureQuestions?: string[]
+  }
+  unresolvedQuestions?: {
+    stillConfused?: string[]
+    noAnswerYet?: string[]
+    worthObserving?: string[]
+  }
+}
+
+interface ObservationArchive {
+  id: string
+  archiveCode: string
+  status: "archived" | "confirmed" | "ignored"
+  originalLanguage: string
+  summary: string
+  content: string | ObservationArchiveCard
+  tags: string | string[]
+  futureUse: string
+  createdAt: string
+}
+
 interface Project {
   id: string
   title: string
@@ -37,6 +86,7 @@ interface Project {
   videoType: string
   durationSeconds: number
   sourceMaterials: SourceMaterialItem[]
+  observationArchives: ObservationArchive[]
   topics: Topic[]
   references: Reference[]
   scriptVersions?: { id: string; title: string; status: string }[]
@@ -82,6 +132,7 @@ export default function WorkbenchPage() {
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [generatingTopics, setGeneratingTopics] = useState(false)
+  const [generatingArchive, setGeneratingArchive] = useState(false)
   const [generatingScript, setGeneratingScript] = useState(false)
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
   const [savingTopic, setSavingTopic] = useState(false)
@@ -113,6 +164,7 @@ export default function WorkbenchPage() {
   const [newMaterialContent, setNewMaterialContent] = useState("")
   const [savingMaterial, setSavingMaterial] = useState(false)
   const [expandedMaterials, setExpandedMaterials] = useState<Set<string>>(new Set())
+  const [expandedArchives, setExpandedArchives] = useState<Set<string>>(new Set())
   const [fullMaterials, setFullMaterials] = useState<Record<string, string>>({})
   const [loadingFullMaterial, setLoadingFullMaterial] = useState<Set<string>>(new Set())
   const [materialMetadata, setMaterialMetadata] = useState<Record<string, unknown>>({})
@@ -227,6 +279,53 @@ export default function WorkbenchPage() {
     }
   }
 
+  // ─── Observation Archives ───
+
+  const parseArchiveCard = (archive: ObservationArchive): ObservationArchiveCard => {
+    if (typeof archive.content !== "string") return archive.content
+    try { return JSON.parse(archive.content) } catch { return {} }
+  }
+
+  const parseArchiveTags = (archive: ObservationArchive): string[] => {
+    if (Array.isArray(archive.tags)) return archive.tags
+    try { return JSON.parse(archive.tags || "[]") } catch { return [] }
+  }
+
+  const toggleArchiveExpand = (archiveId: string) => {
+    setExpandedArchives(prev => {
+      const next = new Set(prev)
+      if (next.has(archiveId)) next.delete(archiveId)
+      else next.add(archiveId)
+      return next
+    })
+  }
+
+  const handleGenerateObservationArchive = async () => {
+    setGeneratingArchive(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/observation-archives/generate`, { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.message || "观察档案生成失败"); return }
+      toast.success("观察档案已生成")
+      loadProject()
+    } catch {
+      toast.error("网络错误")
+    } finally { setGeneratingArchive(false) }
+  }
+
+  const handleUpdateArchiveStatus = async (archiveId: string, status: ObservationArchive["status"]) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/observation-archives/${archiveId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.message || "更新档案失败"); return }
+      toast.success(status === "confirmed" ? "已确认用于选题" : status === "ignored" ? "已暂不使用" : "已恢复为归档")
+      loadProject()
+    } catch { toast.error("网络错误") }
+  }
   // ─── Topics ───
 
   const handleGenerateTopics = async () => {
@@ -530,6 +629,139 @@ export default function WorkbenchPage() {
         </CardContent>
       </Card>
 
+      {/* ═══ Observation Archives ═══ */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="w-4 h-4" /> 生活观察档案
+              {(project.observationArchives?.length || 0) > 0 && (
+                <Badge variant="secondary" className="text-xs">{project.observationArchives.length} 张</Badge>
+              )}
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateObservationArchive}
+              disabled={generatingArchive || project.sourceMaterials.length === 0}
+            >
+              {generatingArchive ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> 归档中...</> : "生成观察档案"}
+            </Button>
+          </div>
+          <CardDescription>
+            先把原始素材整理成长期可调用的生活观察资产。确认后的档案会优先进入选题 Agent。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(project.observationArchives?.length || 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">还没有观察档案。建议先归档，再主观确认哪些素材进入选题。</p>
+          ) : (
+            <div className="space-y-3">
+              {project.observationArchives.map(archive => {
+                const isExpanded = expandedArchives.has(archive.id)
+                const card = parseArchiveCard(archive)
+                const tags = parseArchiveTags(archive)
+                return (
+                  <div key={archive.id} className="border rounded-lg overflow-hidden">
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-xs">{archive.archiveCode}</Badge>
+                            <Badge
+                              variant={archive.status === "confirmed" ? "default" : "outline"}
+                              className="text-xs"
+                            >
+                              {archive.status === "confirmed" ? "已确认" : archive.status === "ignored" ? "暂不使用" : "已归档"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-medium mt-2">{archive.summary}</p>
+                          {archive.originalLanguage && (
+                            <p className="text-xs text-muted-foreground mt-1">原始语言：{archive.originalLanguage}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button variant="ghost" size="sm" onClick={() => toggleArchiveExpand(archive.id)}>
+                            {isExpanded ? "收起" : "查看"}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "confirmed")}>
+                            确认
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "ignored")}>
+                            忽略
+                          </Button>
+                        </div>
+                      </div>
+                      {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {tags.map(tag => <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>)}
+                        </div>
+                      )}
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t bg-muted/20 p-4 space-y-4 text-sm">
+                        <section>
+                          <h4 className="font-semibold mb-1">1. 原始事件</h4>
+                          <p>发生时间/阶段：{card.originalEvent?.timeOrStage || "-"}</p>
+                          <p>发生场景：{card.originalEvent?.scene || "-"}</p>
+                          <p>具体事件：{card.originalEvent?.concreteEvent || "-"}</p>
+                          {(card.originalEvent?.peopleInvolved?.length || 0) > 0 && <p>涉及人物：{card.originalEvent?.peopleInvolved?.join("、")}</p>}
+                          {(card.originalEvent?.keyDetails?.length || 0) > 0 && <p>关键细节：{card.originalEvent?.keyDetails?.join("；")}</p>}
+                        </section>
+
+                        <section>
+                          <h4 className="font-semibold mb-1">2. 原始语言</h4>
+                          <p>{card.originalLanguage?.creatorQuote || archive.originalLanguage || "-"}</p>
+                          {(card.originalLanguage?.preservedPhrases?.length || 0) > 0 && (
+                            <p className="text-muted-foreground">保留片段：{card.originalLanguage?.preservedPhrases?.join("；")}</p>
+                          )}
+                        </section>
+
+                        <section>
+                          <h4 className="font-semibold mb-1">3. 当时状态</h4>
+                          <p>行为：{card.currentState?.behavior || "-"}</p>
+                          <p>情绪：{card.currentState?.emotion || "-"}</p>
+                          <p>身体感受：{card.currentState?.bodyFeeling || "-"}</p>
+                          <p>脑中的想法：{card.currentState?.thoughts || "-"}</p>
+                          <p>当时认为的问题：{card.currentState?.perceivedProblemAtThatTime || "-"}</p>
+                        </section>
+
+                        <section>
+                          <h4 className="font-semibold mb-1">4. 后续观察</h4>
+                          <p>后来变化：{card.laterObservation?.laterChanges || "-"}</p>
+                          <p>重新怎么看：{card.laterObservation?.newView || "-"}</p>
+                          <p>新的理解：{card.laterObservation?.newUnderstanding || "-"}</p>
+                        </section>
+
+                        <section>
+                          <h4 className="font-semibold mb-1">5. 隐藏主题</h4>
+                          <p>{card.hiddenThemes?.join("、") || "-"}</p>
+                        </section>
+
+                        <section>
+                          <h4 className="font-semibold mb-1">6. 可延展素材</h4>
+                          <p>类似经历：{card.extensibleMaterials?.similarExperiences?.join("；") || "-"}</p>
+                          <p>相关故事：{card.extensibleMaterials?.relatedStories?.join("；") || "-"}</p>
+                          <p>未来问题：{card.extensibleMaterials?.futureQuestions?.join("；") || "-"}</p>
+                          {archive.futureUse && <p className="text-muted-foreground mt-1">未来调用：{archive.futureUse}</p>}
+                        </section>
+
+                        <section>
+                          <h4 className="font-semibold mb-1">7. 未解决的问题</h4>
+                          <p>仍然困惑：{card.unresolvedQuestions?.stillConfused?.join("；") || "-"}</p>
+                          <p>还没有答案：{card.unresolvedQuestions?.noAnswerYet?.join("；") || "-"}</p>
+                          <p>值得继续观察：{card.unresolvedQuestions?.worthObserving?.join("；") || "-"}</p>
+                        </section>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* ═══ Topics ═══ */}
       <Card>
         <CardHeader className="pb-2">
@@ -825,3 +1057,6 @@ export default function WorkbenchPage() {
     </div>
   )
 }
+
+
+

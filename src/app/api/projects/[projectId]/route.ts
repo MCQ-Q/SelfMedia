@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { AppError } from "@/lib/errors"
 
@@ -13,6 +13,7 @@ export async function GET(
       where: { id: projectId },
       include: {
         sourceMaterials: { orderBy: { createdAt: "desc" } },
+        observationArchives: { orderBy: { createdAt: "desc" } },
         topics: { orderBy: { score: "desc" }, include: { knowledgeItems: true } },
         references: true,
         scriptVersions: { take: 1, orderBy: { createdAt: "desc" }, include: { segments: { include: { tracks: true }, orderBy: { orderIndex: "asc" } } } },
@@ -71,3 +72,4 @@ export async function DELETE(
     return NextResponse.json({ error: "INTERNAL_ERROR", message: "Failed to delete project" }, { status: 500 })
   }
 }
+

@@ -1,4 +1,4 @@
-generator client {
+﻿generator client {
   provider = "prisma-client-js"
 }
 
@@ -24,6 +24,7 @@ model Project {
   updatedAt       DateTime @updatedAt
 
   sourceMaterials SourceMaterial[]
+  observationArchives ObservationArchive[]
   topics          Topic[]
   references      Reference[]
   scriptVersions  ScriptVersion[]
@@ -51,6 +52,27 @@ model SourceMaterial {
   @@index([projectId])
 }
 
+// ─── Observation Archive ───
+
+model ObservationArchive {
+  id                String   @id @default(cuid())
+  projectId         String
+  sourceMaterialIds String   @default("[]") // JSON array
+  archiveCode       String   @unique
+  status            String   @default("archived") // archived | confirmed | ignored
+  originalLanguage  String   @default("")
+  summary           String   @default("")
+  content           String   // JSON card
+  tags              String   @default("[]") // JSON array
+  futureUse         String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@index([createdAt])
+}
 // ─── Topic ───
 
 model Topic {
@@ -272,3 +294,5 @@ model ProjectEvent {
 
   @@index([projectId, id])
 }
+
+

@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentContext } from "./types"
+﻿import type { AgentConfig, AgentContext } from "./types"
 
 export const topicConfig: AgentConfig = {
   type: "topic",
@@ -22,6 +22,13 @@ export function buildTopicPrompt(ctx: AgentContext): { system: string; user: str
 
 ## 核心目标
 让观众产生"原来我也有这种感觉，只是我没有想过为什么"，而不是"这个人懂很多"。
+
+## 观察档案输入规则
+如果素材内容中包含“观察档案ID”“原始语言”“档案卡片”，说明前置生活观察归档 Agent 已经完成整理。此时你必须：
+- 优先使用观察档案中的原始语言、原始事件、当时状态、后续观察和未解决问题。
+- 不要改变观察档案中的事实。
+- 不要把档案改写成鸡汤或宏大观点。
+- 选题必须能追溯到某一张观察档案的具体经历或模糊体验。
 
 ## 选题筛选原则
 
@@ -67,7 +74,7 @@ ${ctx.sourceContent}
 视频类型：${ctx.videoType}
 目标时长：${ctx.durationSeconds}s
 
-分析素材，生成 5 个差异化的视频选题候选。优先从素材中提取真实事件、异常感受和隐藏矛盾。JSON 结构如下：
+分析素材，生成 5 个差异化的视频选题候选。优先从观察档案或原始素材中提取真实事件、异常感受和隐藏矛盾。如果输入包含观察档案，请把档案中的原始语言和未解决问题作为重要线索。JSON 结构如下：
 {
   "themeSummary": "整体主题的一句话概括",
   "candidates": [
@@ -86,3 +93,4 @@ ${ctx.sourceContent}
 
   return { system, user }
 }
+

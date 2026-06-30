@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { generateTopicsSchema } from "@/lib/schemas"
 import { workflowRunner } from "@/lib/workflow-runner"
@@ -15,7 +15,10 @@ export async function POST(
 
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      include: { sourceMaterials: { orderBy: { createdAt: "desc" } } },
+      include: {
+        sourceMaterials: { orderBy: { createdAt: "desc" } },
+        observationArchives: { orderBy: { createdAt: "desc" } },
+      },
     })
 
     if (!project) {
@@ -25,24 +28,37 @@ export async function POST(
       )
     }
 
-    // Concatenate all source materials, newest first
-    const sourceContent = project.sourceMaterials
+    const selectedArchives = project.observationArchives.filter(a => a.status === "confirmed")
+    const fallbackArchives = selectedArchives.length > 0
+      ? selectedArchives
+      : project.observationArchives.filter(a => a.status === "archived")
+
+    const archiveContent = fallbackArchives
+      .map(archive => {
+        const tags = JSON.parse(archive.tags || "[]").join("、")
+        return [
+          `# 观察档案ID：${archive.archiveCode}`,
+          `摘要：${archive.summary}`,
+          `原始语言：${archive.originalLanguage}`,
+          `主题标签：${tags}`,
+          `未来调用：${archive.futureUse}`,
+          `档案卡片：${archive.content}`,
+        ].join("\n")
+      })
+      .join("\n\n---\n\n")
+
+    // Prefer confirmed/archived observation assets. Fall back to raw source material only when no archive exists.
+    const sourceContent = archiveContent || project.sourceMaterials
       .map(sm => sm.contentEncrypted || sm.contentPreview)
       .filter(Boolean)
       .join("\n\n---\n\n")
-    if (!sourceContent) {
-      return NextResponse.json(
-        { error: "NO_SOURCE_MATERIAL", message: "No source material found" },
-        { status: 400 }
-      )
-    }
-    if (!sourceContent) {
-      return NextResponse.json(
-        { error: "NO_SOURCE_MATERIAL", message: "No source material found" },
-        { status: 400 }
-      )
-    }
 
+    if (!sourceContent) {
+      return NextResponse.json(
+        { error: "NO_SOURCE_MATERIAL", message: "No source material found" },
+        { status: 400 }
+      )
+    }
     // Delete old unselected candidate topics
     await prisma.topic.deleteMany({
       where: {
@@ -86,3 +102,5 @@ export async function POST(
     )
   }
 }
+
+

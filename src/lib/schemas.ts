@@ -1,4 +1,4 @@
-import { z } from "zod"
+﻿import { z } from "zod"
 
 // ─── Enums ───
 
@@ -10,10 +10,10 @@ export const projectStatusEnum = z.enum([
   "references_ready", "script_generating", "script_draft", "exported", "archived",
 ])
 export const workflowTypeEnum = z.enum([
-  "topic_generation", "reference_collection", "script_generation", "segment_rewrite",
+  "topic_generation", "observation_archive", "reference_collection", "script_generation", "segment_rewrite",
 ])
 export const stepKeyEnum = z.enum([
-  "topic", "reference", "outline", "hook", "dialogue",
+  "topic", "observation_archive", "reference", "outline", "hook", "dialogue",
   "emotion", "visual", "bgm", "director", "segment_rewrite",
 ])
 export const agentTypeEnum = stepKeyEnum
@@ -36,6 +36,55 @@ export const createProjectSchema = z.object({
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>
 
+// ─── Observation Archive Agent ───
+
+export const observationArchiveCardSchema = z.object({
+  originalEvent: z.object({
+    timeOrStage: z.string(),
+    scene: z.string(),
+    concreteEvent: z.string(),
+    peopleInvolved: z.array(z.string()).default([]),
+    keyDetails: z.array(z.string()).default([]),
+  }),
+  originalLanguage: z.object({
+    creatorQuote: z.string(),
+    preservedPhrases: z.array(z.string()).default([]),
+  }),
+  currentState: z.object({
+    behavior: z.string(),
+    emotion: z.string(),
+    bodyFeeling: z.string(),
+    thoughts: z.string(),
+    perceivedProblemAtThatTime: z.string(),
+  }),
+  laterObservation: z.object({
+    laterChanges: z.string(),
+    newView: z.string(),
+    newUnderstanding: z.string(),
+  }),
+  hiddenThemes: z.array(z.string()).default([]),
+  extensibleMaterials: z.object({
+    similarExperiences: z.array(z.string()).default([]),
+    relatedStories: z.array(z.string()).default([]),
+    futureQuestions: z.array(z.string()).default([]),
+  }),
+  unresolvedQuestions: z.object({
+    stillConfused: z.array(z.string()).default([]),
+    noAnswerYet: z.array(z.string()).default([]),
+    worthObserving: z.array(z.string()).default([]),
+  }),
+})
+
+export const observationArchiveOutputSchema = z.object({
+  archiveCode: z.string(),
+  summary: z.string(),
+  originalLanguage: z.string(),
+  tags: z.array(z.string()).default([]),
+  futureUse: z.string(),
+  card: observationArchiveCardSchema,
+})
+
+export type ObservationArchiveOutput = z.infer<typeof observationArchiveOutputSchema>
 // ─── Topic Agent ───
 
 export const topicCandidateSchema = z.object({
@@ -446,3 +495,4 @@ export function validateScriptContent(content: unknown): {
   }
   return { valid: errors.length === 0, errors }
 }
+

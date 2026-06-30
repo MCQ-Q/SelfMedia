@@ -1,7 +1,7 @@
-import type { AgentConfig, AgentContext } from "./types"
+﻿import type { AgentConfig, AgentContext } from "./types"
 import type { z, ZodSchema } from "zod"
 import {
-  topicOutputSchema, referenceOutputSchema, outlineSchema, hookPlanSchema,
+  topicOutputSchema, observationArchiveOutputSchema, referenceOutputSchema, outlineSchema, hookPlanSchema,
   dialogueOutputSchema, emotionOutputSchema, visualOutputSchema, bgmOutputSchema,
   directorOutputSchema, rewriteSegmentOutputSchema,
 } from "../schemas"
@@ -17,6 +17,7 @@ export interface AgentDefinition {
 // Lazy imports to avoid circular deps
 const agentModules: Record<string, () => Promise<{ config: AgentConfig; buildPrompt: (ctx: AgentContext) => { system: string; user: string } }>> = {
   topic:       () => import("./topic").then(m => ({ config: m.topicConfig, buildPrompt: m.buildTopicPrompt })),
+  observation_archive: () => import("./observation-archive").then(m => ({ config: m.observationArchiveConfig, buildPrompt: m.buildObservationArchivePrompt })),
   reference:   () => import("./reference").then(m => ({ config: m.referenceConfig, buildPrompt: m.buildReferencePrompt })),
   outline:     () => import("./outline").then(m => ({ config: m.outlineConfig, buildPrompt: m.buildOutlinePrompt })),
   hook:        () => import("./hook").then(m => ({ config: m.hookConfig, buildPrompt: m.buildHookPrompt })),
@@ -30,6 +31,7 @@ const agentModules: Record<string, () => Promise<{ config: AgentConfig; buildPro
 
 const agentSchemas: Record<string, ZodSchema> = {
   topic:            topicOutputSchema,
+  observation_archive: observationArchiveOutputSchema,
   reference:        referenceOutputSchema,
   outline:          outlineSchema,
   hook:             hookPlanSchema,
@@ -76,6 +78,10 @@ export const SCRIPT_PIPELINE_STEPS = [
   { stepKey: "director", dependsOn: ["outline", "hook", "dialogue", "emotion", "visual", "bgm"] },
 ]
 
+export const OBSERVATION_ARCHIVE_STEPS = [
+  { stepKey: "observation_archive", dependsOn: [] as string[] },
+]
+
 export const TOPIC_PIPELINE_STEPS = [
   { stepKey: "topic", dependsOn: [] as string[] },
 ]
@@ -87,3 +93,5 @@ export const REFERENCE_PIPELINE_STEPS = [
 export const REWRITE_PIPELINE_STEPS = [
   { stepKey: "segment_rewrite", dependsOn: [] as string[] },
 ]
+
+
