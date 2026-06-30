@@ -43,7 +43,10 @@ export async function POST(
           topicId,
           title: item.title || `手动参考 ${referenceIds.length + 1}`,
           url: item.url || null,
+          author: item.author || "",
           transcript: item.transcript,
+          metrics: JSON.stringify(item.metrics || {}),
+          rawData: JSON.stringify(item.rawData || {}),
         },
       })
       referenceIds.push(ref.id)

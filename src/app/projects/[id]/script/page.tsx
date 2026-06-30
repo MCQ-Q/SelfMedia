@@ -13,8 +13,9 @@ import { toast } from "sonner"
 import {
   ArrowLeft, Download, Save, Loader2, Clock,
   MessageSquare, Heart, Music, Lock, RefreshCw,
-  Sparkles,
+  Sparkles, Monitor,
 } from "lucide-react"
+import { Teleprompter } from "@/components/teleprompter"
 
 interface TrackObj {
   type?: string
@@ -137,6 +138,7 @@ export default function ScriptPage() {
   const [pipelineSteps, setPipelineSteps] = useState<PipelineStep[]>([])
   const [expandedStep, setExpandedStep] = useState<string | null>(null)
   const [loadingPipeline, setLoadingPipeline] = useState(false)
+  const [teleprompterOpen, setTeleprompterOpen] = useState(false)
 
   const loadScript = useCallback(async () => {
     try {
@@ -267,6 +269,11 @@ export default function ScriptPage() {
           <h1 className="text-2xl font-bold">{script?.title || "台本详情"}</h1>
         </div>
         <div className="flex items-center gap-2">
+          {script && script.segments.length > 0 && (
+            <Button size="sm" variant="secondary" onClick={() => setTeleprompterOpen(true)}>
+              <Monitor className="w-3 h-3 mr-1" /> 提词器
+            </Button>
+          )}
           {script && (
             <Button size="sm" onClick={handleExport}>
               <Download className="w-3 h-3 mr-1" /> 导出 Markdown
@@ -526,6 +533,22 @@ export default function ScriptPage() {
               </Card>
             ))}
           </div>
+
+          {/* ═══ Teleprompter ═══ */}
+          <Teleprompter
+            segments={script.segments.map((s) => ({
+              id: s.id,
+              orderIndex: s.orderIndex,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              dialogue: s.dialogue,
+              subtitleText: s.subtitleText,
+              segmentGoal: s.segmentGoal,
+            }))}
+            title={script.title}
+            open={teleprompterOpen}
+            onClose={() => setTeleprompterOpen(false)}
+          />
         </>
       )}
     </div>

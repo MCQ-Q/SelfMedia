@@ -13,8 +13,10 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import {
   ArrowLeft, Loader2, Sparkles, CheckCircle2, FileText, Plus, Trash2,
-  ChevronDown, ChevronRight, Clock,
+  ChevronDown, ChevronRight, Clock, Link2, Pencil, Save, X,
 } from "lucide-react"
+import { DouyinUrlInput } from "@/components/douyin-url-input"
+import type { ConfirmedDouyinData } from "@/components/douyin-url-input"
 
 // ─── Interfaces ───
 
@@ -81,18 +83,39 @@ export default function WorkbenchPage() {
   const [loading, setLoading] = useState(true)
   const [generatingTopics, setGeneratingTopics] = useState(false)
   const [generatingScript, setGeneratingScript] = useState(false)
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
+  const [savingTopic, setSavingTopic] = useState(false)
+  // Editable fields for a topic when in edit mode
+  const [topicEditForm, setTopicEditForm] = useState<{
+    title: string
+    targetAudience: string
+    coreConflict: string
+    emotionalTone: string
+    score: number
+    reason: string
+  }>({ title: "", targetAudience: "", coreConflict: "", emotionalTone: "", score: 0, reason: "" })
   const [showReference, setShowReference] = useState(false)
-  const [refItems, setRefItems] = useState<{ title: string; transcript: string }[]>([{ title: "", transcript: "" }])
+  const [refItems, setRefItems] = useState<{
+    title: string
+    transcript: string
+    url?: string
+    author?: string
+    metrics?: Record<string, unknown>
+    rawData?: Record<string, unknown>
+    inputMode?: "manual" | "douyin"
+  }[]>([{ title: "", transcript: "", inputMode: "manual" }])
   const [savedRefIds, setSavedRefIds] = useState<string[]>([])
 
   // Source material state
   const [showAddMaterial, setShowAddMaterial] = useState(false)
+  const [materialInputMode, setMaterialInputMode] = useState<"manual" | "douyin">("manual")
   const [newMaterialType, setNewMaterialType] = useState("note")
   const [newMaterialContent, setNewMaterialContent] = useState("")
   const [savingMaterial, setSavingMaterial] = useState(false)
   const [expandedMaterials, setExpandedMaterials] = useState<Set<string>>(new Set())
   const [fullMaterials, setFullMaterials] = useState<Record<string, string>>({})
   const [loadingFullMaterial, setLoadingFullMaterial] = useState<Set<string>>(new Set())
+  const [materialMetadata, setMaterialMetadata] = useState<Record<string, unknown>>({})
 
   const loadProject = useCallback(async () => {
     try {
@@ -115,22 +138,50 @@ export default function WorkbenchPage() {
     if (!newMaterialContent.trim()) { toast.error("请输入素材内容"); return }
     setSavingMaterial(true)
     try {
+      const body: Record<string, unknown> = {
+        content: newMaterialContent,
+        type: newMaterialType,
+        metadata: materialMetadata,
+      }
       const res = await fetch(`/api/projects/${projectId}/source-materials`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newMaterialContent, type: newMaterialType }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.message || "保存失败"); return }
       toast.success("素材已保存")
       setNewMaterialContent("")
+      setMaterialMetadata({})
       setShowAddMaterial(false)
+      setMaterialInputMode("manual")
       loadProject()
     } catch {
       toast.error("网络错误")
     } finally {
       setSavingMaterial(false)
     }
+  }
+
+  const handleDouyinMaterialExtracted = (data: ConfirmedDouyinData) => {
+    // Use the pre-formatted content from the extractor, or build a simple version
+    const content = data.description || [
+      data.title ? `标题：${data.title}` : "",
+      data.author ? `作者：@${data.author}` : "",
+      data.url ? `\n链接：${data.url}` : "",
+    ].filter(Boolean).join("\n")
+
+    setNewMaterialContent(content)
+    setNewMaterialType("note")
+    setMaterialMetadata({
+      sourceUrl: data.url,
+      sourcePlatform: "douyin",
+      sourceAuthor: data.author,
+      douyinRawData: data.rawData as unknown as Record<string, unknown>,
+    })
+    setMaterialInputMode("manual")
+
+    toast.success("抖音内容已提取，可编辑后保存")
   }
 
   const toggleMaterialExpand = async (materialId: string) => {
@@ -206,6 +257,41 @@ export default function WorkbenchPage() {
     } catch { toast.error("网络错误") }
   }
 
+  const handleStartEditTopic = (topic: Topic) => {
+    setEditingTopicId(topic.id)
+    setTopicEditForm({
+      title: topic.title,
+      targetAudience: topic.targetAudience,
+      coreConflict: topic.coreConflict,
+      emotionalTone: topic.emotionalTone,
+      score: topic.score,
+      reason: topic.reason,
+    })
+  }
+
+  const handleCancelEditTopic = () => {
+    setEditingTopicId(null)
+  }
+
+  const handleSaveTopic = async () => {
+    if (!editingTopicId) return
+    setSavingTopic(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/topics/${editingTopicId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(topicEditForm),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.message || "保存失败"); return }
+      toast.success("选题已更新")
+      setEditingTopicId(null)
+      loadProject()
+    } catch {
+      toast.error("网络错误")
+    } finally { setSavingTopic(false) }
+  }
+
   // ─── References ───
 
   const handleSaveReferences = async () => {
@@ -215,7 +301,16 @@ export default function WorkbenchPage() {
       const res = await fetch(`/api/projects/${projectId}/references/manual`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: valid }),
+        body: JSON.stringify({
+          items: valid.map(r => ({
+            title: r.title,
+            url: r.url || "",
+            author: r.author || "",
+            transcript: r.transcript,
+            metrics: r.metrics || {},
+            rawData: r.rawData || {},
+          })),
+        }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.message || "保存参考失败"); return }
@@ -305,27 +400,74 @@ export default function WorkbenchPage() {
           {/* Add form */}
           {showAddMaterial && (
             <div className="p-4 rounded-lg border border-dashed space-y-3">
-              <div className="flex items-center gap-3">
-                <Label className="text-sm whitespace-nowrap">素材类型</Label>
+              {/* Input mode toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm whitespace-nowrap">素材类型</Label>
+                  <div className="flex gap-1">
+                    {(["chat_log", "reflection", "note", "draft"] as const).map(t => (
+                      <Badge
+                        key={t}
+                        variant={newMaterialType === t ? "default" : "outline"}
+                        className="cursor-pointer text-xs"
+                        onClick={() => setNewMaterialType(t)}
+                      >
+                        {materialTypeLabels[t]}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex gap-1">
-                  {(["chat_log", "reflection", "note", "draft"] as const).map(t => (
-                    <Badge
-                      key={t}
-                      variant={newMaterialType === t ? "default" : "outline"}
-                      className="cursor-pointer text-xs"
-                      onClick={() => setNewMaterialType(t)}
-                    >
-                      {materialTypeLabels[t]}
-                    </Badge>
-                  ))}
+                  <Badge
+                    variant={materialInputMode === "manual" ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => setMaterialInputMode("manual")}
+                  >
+                    <Pencil className="w-3 h-3 mr-0.5" />
+                    手动输入
+                  </Badge>
+                  <Badge
+                    variant={materialInputMode === "douyin" ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => setMaterialInputMode("douyin")}
+                  >
+                    <Link2 className="w-3 h-3 mr-0.5" />
+                    抖音链接
+                  </Badge>
                 </div>
               </div>
-              <Textarea
-                placeholder="粘贴聊天记录、个人感悟、灵感片段或已有文案..."
-                rows={6}
-                value={newMaterialContent}
-                onChange={e => setNewMaterialContent(e.target.value)}
-              />
+
+              {/* Douyin mode */}
+              {materialInputMode === "douyin" && (
+                <DouyinUrlInput
+                  onConfirm={handleDouyinMaterialExtracted}
+                  onCancel={() => setMaterialInputMode("manual")}
+                />
+              )}
+
+              {/* Manual mode */}
+              {materialInputMode === "manual" && (
+                <>
+                  {Object.keys(materialMetadata).length > 0 && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Link2 className="w-3 h-3" />
+                      来源: {materialMetadata.sourceUrl as string || "抖音链接"}
+                      <button
+                        className="text-primary hover:underline ml-2"
+                        onClick={() => { setMaterialMetadata({}); setNewMaterialContent("") }}
+                      >
+                        清除
+                      </button>
+                    </div>
+                  )}
+                  <Textarea
+                    placeholder="粘贴聊天记录、个人感悟、灵感片段或已有文案..."
+                    rows={6}
+                    value={newMaterialContent}
+                    onChange={e => setNewMaterialContent(e.target.value)}
+                  />
+                </>
+              )}
               <div className="flex justify-end gap-2">
                 <Button size="sm" onClick={handleAddMaterial} disabled={savingMaterial || !newMaterialContent.trim()}>
                   {savingMaterial ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> 保存中...</> : "保存素材"}
@@ -408,29 +550,123 @@ export default function WorkbenchPage() {
             <div className="grid gap-3">
               {project.topics.map(topic => {
                 const isSelected = topic.id === project.selectedTopicId
+                const isEditing = editingTopicId === topic.id
                 return (
                   <Card
                     key={topic.id}
-                    className={`cursor-pointer transition-colors ${isSelected ? "border-primary ring-1 ring-primary" : "hover:border-primary/50"}`}
-                    onClick={() => handleSelectTopic(topic.id)}
+                    className={`transition-colors ${isSelected ? "border-primary ring-1 ring-primary" : "hover:border-primary/50"}`}
                   >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-sm flex items-center gap-2">
-                            {isSelected && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
-                            {topic.title}
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            {topic.coreConflict} · {topic.emotionalTone} · 受众: {topic.targetAudience}
-                          </CardDescription>
-                        </div>
-                        <Badge variant="secondary" className="shrink-0">{(topic.score * 100).toFixed(0)}分</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <p className="text-xs text-muted-foreground">{topic.reason}</p>
-                    </CardContent>
+                    {isEditing ? (
+                      /* ═══ Edit mode ═══ */
+                      <>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm">编辑选题</CardTitle>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost" size="sm" className="h-7 w-7 p-0"
+                                onClick={handleSaveTopic} disabled={savingTopic}
+                              >
+                                {savingTopic ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5 text-green-600" />}
+                              </Button>
+                              <Button
+                                variant="ghost" size="sm" className="h-7 w-7 p-0"
+                                onClick={handleCancelEditTopic} disabled={savingTopic}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">标题</Label>
+                            <Input
+                              value={topicEditForm.title}
+                              onChange={e => setTopicEditForm(prev => ({ ...prev, title: e.target.value }))}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">核心冲突</Label>
+                            <Input
+                              value={topicEditForm.coreConflict}
+                              onChange={e => setTopicEditForm(prev => ({ ...prev, coreConflict: e.target.value }))}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">情感基调</Label>
+                              <Input
+                                value={topicEditForm.emotionalTone}
+                                onChange={e => setTopicEditForm(prev => ({ ...prev, emotionalTone: e.target.value }))}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">目标受众</Label>
+                              <Input
+                                value={topicEditForm.targetAudience}
+                                onChange={e => setTopicEditForm(prev => ({ ...prev, targetAudience: e.target.value }))}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">评分 (0-1)</Label>
+                            <Input
+                              type="number"
+                              min={0} max={1} step={0.01}
+                              value={topicEditForm.score}
+                              onChange={e => setTopicEditForm(prev => ({ ...prev, score: parseFloat(e.target.value) || 0 }))}
+                              className="h-8 text-sm w-24"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">推荐理由</Label>
+                            <Textarea
+                              value={topicEditForm.reason}
+                              onChange={e => setTopicEditForm(prev => ({ ...prev, reason: e.target.value }))}
+                              rows={3}
+                              className="text-sm"
+                            />
+                          </div>
+                        </CardContent>
+                      </>
+                    ) : (
+                      /* ═══ View mode ═══ */
+                      <>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div
+                              className="flex-1 min-w-0 cursor-pointer"
+                              onClick={() => handleSelectTopic(topic.id)}
+                            >
+                              <CardTitle className="text-sm flex items-center gap-2">
+                                {isSelected && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
+                                {topic.title}
+                              </CardTitle>
+                              <CardDescription className="mt-1">
+                                {topic.coreConflict} · {topic.emotionalTone} · 受众: {topic.targetAudience}
+                              </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost" size="sm" className="h-7 w-7 p-0"
+                                onClick={(e) => { e.stopPropagation(); handleStartEditTopic(topic) }}
+                              >
+                                <Pencil className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                              </Button>
+                              <Badge variant="secondary">{(topic.score * 100).toFixed(0)}分</Badge>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <p className="text-xs text-muted-foreground">{topic.reason}</p>
+                        </CardContent>
+                      </>
+                    )}
                   </Card>
                 )
               })}
@@ -458,32 +694,95 @@ export default function WorkbenchPage() {
               {refItems.map((item, idx) => (
                 <div key={idx} className="space-y-2 p-3 border rounded-lg">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs">参考 {idx + 1}</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">参考 {idx + 1}</Label>
+                      <div className="flex gap-1">
+                        <Badge
+                          variant={item.inputMode !== "douyin" ? "default" : "outline"}
+                          className="cursor-pointer text-xs"
+                          onClick={() => {
+                            const next = [...refItems]
+                            next[idx] = { ...next[idx], inputMode: "manual" }
+                            setRefItems(next)
+                          }}
+                        >
+                          <Pencil className="w-2.5 h-2.5 mr-0.5" />
+                          手动
+                        </Badge>
+                        <Badge
+                          variant={item.inputMode === "douyin" ? "default" : "outline"}
+                          className="cursor-pointer text-xs"
+                          onClick={() => {
+                            const next = [...refItems]
+                            next[idx] = { ...next[idx], inputMode: "douyin" }
+                            setRefItems(next)
+                          }}
+                        >
+                          <Link2 className="w-2.5 h-2.5 mr-0.5" />
+                          抖音链接
+                        </Badge>
+                      </div>
+                    </div>
                     {refItems.length > 1 && (
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setRefItems(refItems.filter((_, i) => i !== idx))}>
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     )}
                   </div>
-                  <Input
-                    placeholder="参考视频标题"
-                    value={item.title}
-                    onChange={e => {
-                      const next = [...refItems]
-                      next[idx] = { ...next[idx], title: e.target.value }
-                      setRefItems(next)
-                    }}
-                  />
-                  <Textarea
-                    placeholder="粘贴视频文案或字幕"
-                    rows={3}
-                    value={item.transcript}
-                    onChange={e => {
-                      const next = [...refItems]
-                      next[idx] = { ...next[idx], transcript: e.target.value }
-                      setRefItems(next)
-                    }}
-                  />
+
+                  {/* Douyin link mode */}
+                  {item.inputMode === "douyin" ? (
+                    <DouyinUrlInput
+                      onConfirm={(data: ConfirmedDouyinData) => {
+                        const next = [...refItems]
+                        next[idx] = {
+                          ...next[idx],
+                          title: data.title,
+                          transcript: data.description,
+                          url: data.url,
+                          author: data.author,
+                          metrics: data.metrics,
+                          rawData: data.rawData as unknown as Record<string, unknown>,
+                          inputMode: "manual", // switch back after extraction
+                        }
+                        setRefItems(next)
+                        toast.success("抖音内容已提取到参考")
+                      }}
+                      onCancel={() => {
+                        const next = [...refItems]
+                        next[idx] = { ...next[idx], inputMode: "manual" }
+                        setRefItems(next)
+                      }}
+                    />
+                  ) : (
+                    <>
+                      {item.url && (
+                        <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                          <Link2 className="w-3 h-3 shrink-0" />
+                          {item.url}
+                        </div>
+                      )}
+                      <Input
+                        placeholder="参考视频标题"
+                        value={item.title}
+                        onChange={e => {
+                          const next = [...refItems]
+                          next[idx] = { ...next[idx], title: e.target.value }
+                          setRefItems(next)
+                        }}
+                      />
+                      <Textarea
+                        placeholder="粘贴视频文案或字幕"
+                        rows={3}
+                        value={item.transcript}
+                        onChange={e => {
+                          const next = [...refItems]
+                          next[idx] = { ...next[idx], transcript: e.target.value }
+                          setRefItems(next)
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
               ))}
               <div className="flex gap-2">

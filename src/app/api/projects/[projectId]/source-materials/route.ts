@@ -27,6 +27,7 @@ export async function POST(
         type: input.type,
         contentEncrypted: input.content,
         contentPreview: preview,
+        metadata: JSON.stringify(input.metadata || {}),
       },
     })
 

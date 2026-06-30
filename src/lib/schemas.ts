@@ -325,8 +325,19 @@ export type RewriteSegmentOutput = z.infer<typeof rewriteSegmentOutputSchema>
 export const manualReferenceItemSchema = z.object({
   title: z.string().optional(),
   url: z.string().url().optional().or(z.literal("")),
+  author: z.string().optional(),
   transcript: z.string().trim().min(1),
+  metrics: z.record(z.string(), z.unknown()).optional(),
+  rawData: z.record(z.string(), z.unknown()).optional(),
 })
+
+// ─── Douyin Extract ───
+
+export const douyinExtractRequestSchema = z.object({
+  url: z.string().trim().min(1, "请提供抖音链接"),
+})
+
+export type DouyinExtractRequest = z.infer<typeof douyinExtractRequestSchema>
 
 export const manualReferenceSchema = z.object({
   topicId: z.string().optional(),
@@ -344,6 +355,12 @@ export const generateScriptSchema = z.object({
 export const addSourceMaterialSchema = z.object({
   content: z.string().trim().min(1, "Source material content is required"),
   type: sourceMaterialTypeEnum.default("note"),
+  metadata: z.object({
+    sourceUrl: z.string().url().optional(),
+    sourcePlatform: z.string().optional(),
+    sourceAuthor: z.string().optional(),
+    douyinRawData: z.record(z.string(), z.unknown()).optional(),
+  }).optional().default({}),
 })
 
 export const rewriteSegmentSchema = z.object({
