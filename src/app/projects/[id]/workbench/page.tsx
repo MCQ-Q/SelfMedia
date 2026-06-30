@@ -684,12 +684,24 @@ export default function WorkbenchPage() {
                           <Button variant="ghost" size="sm" onClick={() => toggleArchiveExpand(archive.id)}>
                             {isExpanded ? "收起" : "查看"}
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "confirmed")}>
-                            确认
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "ignored")}>
-                            忽略
-                          </Button>
+                          {archive.status === "confirmed" ? (
+                            <Button variant="outline" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "archived")}>
+                              取消确认
+                            </Button>
+                          ) : archive.status === "ignored" ? (
+                            <Button variant="outline" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "archived")}>
+                              取消忽略
+                            </Button>
+                          ) : (
+                            <>
+                              <Button variant="outline" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "confirmed")}>
+                                确认
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleUpdateArchiveStatus(archive.id, "ignored")}>
+                                忽略
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                       {tags.length > 0 && (
